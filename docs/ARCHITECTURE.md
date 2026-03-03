@@ -29,6 +29,7 @@ Key ideas:
 - On failure, user is redirected to `/login`.
 
 See:
+
 - [middleware.ts](file:///c:/Users/borgi/Documents/trae_projects/New%20folder/saves-admin/middleware.ts)
 - [authService.ts](file:///c:/Users/borgi/Documents/trae_projects/New%20folder/saves-admin/services/authService.ts)
 - [api.ts](file:///c:/Users/borgi/Documents/trae_projects/New%20folder/saves-admin/services/api.ts)
@@ -67,6 +68,6 @@ Domain types used throughout the app:
 - Clicking Fleet Status filters the vehicle list and focuses the map to the matching vehicle positions (single vehicle flies to it; multiple vehicles fit bounds).
 
 See:
+
 - [tracking/page.tsx](file:///c:/Users/borgi/Documents/trae_projects/New%20folder/saves-admin/app/dashboard/tracking/page.tsx)
 - [LeafletMap.tsx](file:///c:/Users/borgi/Documents/trae_projects/New%20folder/saves-admin/components/Map/LeafletMap.tsx)
-

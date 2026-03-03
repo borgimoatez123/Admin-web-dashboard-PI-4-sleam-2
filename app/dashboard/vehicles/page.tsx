@@ -49,6 +49,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Badge } from '@/components/ui/badge';
+import { getCurrentUser } from '@/services/authService';
 
 const VEHICLE_MODELS = ['SAVES_PROTOTYPE_V1', 'SAVES_miniPROTOTYPE_V1'] as const;
 const VEHICLE_VARIANTS = ['SUV', 'SEDAN'] as const;
@@ -133,12 +134,17 @@ export default function VehiclesPage() {
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
+  const [agencyNameFilter, setAgencyNameFilter] = useState<string | undefined>(undefined);
 
   const fetchVehicles = async () => {
     setLoading(true);
     try {
       const data = await getVehicles(1, 100, statusFilter, search);
-      setVehicles(data.vehicles || []);
+      const all: Vehicle[] = (data.vehicles || []) as Vehicle[];
+      const filtered: Vehicle[] = agencyNameFilter
+        ? all.filter((v: Vehicle) => (v.agency?.name ?? '').trim().toLowerCase() === agencyNameFilter.trim().toLowerCase())
+        : all;
+      setVehicles(filtered);
     } catch (error) {
       toast.error('Failed to fetch vehicles');
     } finally {
@@ -147,8 +153,19 @@ export default function VehiclesPage() {
   };
 
   useEffect(() => {
+    let mounted = true;
+    getCurrentUser().then((u) => {
+      if (!mounted) return;
+      setAgencyNameFilter(u?.agencyName);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
     fetchVehicles();
-  }, [search, statusFilter]);
+  }, [search, statusFilter, agencyNameFilter]);
 
   const handleDelete = async (id: string) => {
     if (confirm('Are you sure you want to delete this vehicle?')) {
@@ -244,6 +261,8 @@ export default function VehiclesPage() {
               <TableHead>Price/Day</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>City</TableHead>
+              <TableHead>Agency City</TableHead>
+              <TableHead>Agency</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -275,6 +294,8 @@ export default function VehiclesPage() {
                     {getStatusBadge(vehicle.status)}
                   </TableCell>
                   <TableCell>{vehicle.city}</TableCell>
+                  <TableCell>{vehicle.agency?.location?.city ?? '-'}</TableCell>
+                  <TableCell>{vehicle.agency?.name ?? '-'}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
                       <Button
@@ -526,8 +547,14 @@ function VehicleDialog({
                       <FormControl>
                         <Input
                           type="number"
-                          value={typeof field.value === 'number' ? field.value : ''}
-                          onChange={(e) => field.onChange(e.target.valueAsNumber)}
+                          value={typeof field.value === 'number' && Number.isFinite(field.value) ? field.value : ''}
+                          onChange={(e) => {
+                            if (e.target.value === '') {
+                              field.onChange('');
+                              return;
+                            }
+                            field.onChange(e.target.valueAsNumber);
+                          }}
                           onBlur={field.onBlur}
                           name={field.name}
                           ref={field.ref}
@@ -546,8 +573,14 @@ function VehicleDialog({
                       <FormControl>
                         <Input
                           type="number"
-                          value={typeof field.value === 'number' ? field.value : ''}
-                          onChange={(e) => field.onChange(e.target.valueAsNumber)}
+                          value={typeof field.value === 'number' && Number.isFinite(field.value) ? field.value : ''}
+                          onChange={(e) => {
+                            if (e.target.value === '') {
+                              field.onChange('');
+                              return;
+                            }
+                            field.onChange(e.target.valueAsNumber);
+                          }}
                           onBlur={field.onBlur}
                           name={field.name}
                           ref={field.ref}

@@ -11,6 +11,37 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import Link from 'next/link';
 
+const demoIncidents: Incident[] = [
+  {
+    id: 'demo-incident-1',
+    vehicleId: 'SAVES-001',
+    type: 'STOLEN',
+    location: { lat: 36.8065, lng: 10.1815 },
+    description: 'Geofence breach detected. Vehicle moved outside assigned area and stopped transmitting for 3 minutes.',
+    resolved: false,
+    createdAt: new Date(Date.now() - 1000 * 60 * 22).toISOString(),
+  },
+  {
+    id: 'demo-incident-2',
+    vehicleId: 'SAVES-014',
+    type: 'ACCIDENT',
+    location: { lat: 35.8256, lng: 10.6084 },
+    description: 'Impact event detected. Sudden deceleration and airbag sensor trigger. Immediate verification required.',
+    resolved: false,
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 3).toISOString(),
+  },
+  {
+    id: 'demo-incident-3',
+    vehicleId: 'SAVES-009',
+    type: 'ACCIDENT',
+    location: { lat: 34.7406, lng: 10.7603 },
+    description: 'Low-speed collision alert. Driver reported minor damage. Awaiting field team confirmation.',
+    resolved: true,
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 26).toISOString(),
+    resolvedAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
+  },
+];
+
 export default function IncidentsPage() {
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [loading, setLoading] = useState(true);
@@ -55,6 +86,9 @@ export default function IncidentsPage() {
     );
   }
 
+  const isDemoMode = incidents.length === 0;
+  const incidentsToRender = isDemoMode ? demoIncidents : incidents;
+
   return (
     <div className="space-y-6">
       <div>
@@ -65,14 +99,15 @@ export default function IncidentsPage() {
       </div>
 
       <div className="grid gap-4">
-        {incidents.length === 0 ? (
+        {isDemoMode && (
           <Card>
-            <CardContent className="py-8 text-center text-muted-foreground">
-              No incidents reported.
+            <CardContent className="py-6 text-sm text-muted-foreground">
+              No incidents reported yet. Showing sample alerts.
             </CardContent>
           </Card>
-        ) : (
-          incidents.map((incident) => (
+        )}
+
+        {incidentsToRender.map((incident) => (
             <Card key={incident.id} className={incident.resolved ? 'opacity-70 bg-muted/50' : 'border-l-4 border-l-red-500'}>
               <CardHeader className="pb-2">
                 <div className="flex justify-between items-start">
@@ -85,6 +120,11 @@ export default function IncidentsPage() {
                     <CardTitle className="text-lg">
                       {incident.type} ALERT - Vehicle ID: {incident.vehicleId}
                     </CardTitle>
+                    {isDemoMode && (
+                      <Badge variant="outline" className="ml-2">
+                        Demo
+                      </Badge>
+                    )}
                     {incident.resolved && (
                       <Badge variant="outline" className="ml-2 bg-green-50 text-green-700 border-green-200">
                         Resolved
@@ -111,7 +151,7 @@ export default function IncidentsPage() {
                         View on Map
                       </Button>
                     </Link>
-                    {!incident.resolved && (
+                    {!isDemoMode && !incident.resolved && (
                       <Button 
                         variant="default" 
                         size="sm" 
@@ -126,8 +166,7 @@ export default function IncidentsPage() {
                 </div>
               </CardContent>
             </Card>
-          ))
-        )}
+          ))}
       </div>
     </div>
   );

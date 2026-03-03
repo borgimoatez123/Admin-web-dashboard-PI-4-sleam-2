@@ -35,36 +35,37 @@ Professional Admin Dashboard for the S.A.V.E.S Rental System.
 
 1. **Install dependencies:**
 
-    ```bash
-    npm install
-    ```
+   ```bash
+   npm install
+   ```
 
 2. **Configure environment (optional):**
 
-    Create `.env.local`:
+   Create `.env.local`:
 
-    ```bash
-    NEXT_PUBLIC_API_URL=http://localhost:5000/api/v1
-    ```
+   ```bash
+   NEXT_PUBLIC_API_URL=http://localhost:5000/api/v1
+   ```
 
-    If not provided, the app uses `http://localhost:5000/api/v1` by default.
+   If not provided, the app uses `http://localhost:5000/api/v1` by default.
 
 3. **Run the development server:**
 
-    ```bash
-    npm run dev
-    ```
+   ```bash
+   npm run dev
+   ```
 
 4. **Open the dashboard:**
 
-    Navigate to [http://localhost:3000](http://localhost:3000). You will be redirected to the login page.
+   Navigate to [http://localhost:3000](http://localhost:3000). You will be redirected to the login page.
 
 5. **Login:**
 
-    Use an admin account that exists in your backend.
+   Use an admin account that exists in your backend.
 
-    Example used during local development:
-    - `admin@saves.com` / `saves123@A`
+   Example used during local development:
+
+   - `admin@saves.com` / `saves123@A`
 
 ## Environment Variables
 
@@ -83,6 +84,7 @@ Professional Admin Dashboard for the S.A.V.E.S Rental System.
   - user role is not admin
 
 Key files:
+
 - [authService.ts](file:///c:/Users/borgi/Documents/trae_projects/New%20folder/saves-admin/services/authService.ts)
 - [api.ts](file:///c:/Users/borgi/Documents/trae_projects/New%20folder/saves-admin/services/api.ts)
 - [middleware.ts](file:///c:/Users/borgi/Documents/trae_projects/New%20folder/saves-admin/middleware.ts)

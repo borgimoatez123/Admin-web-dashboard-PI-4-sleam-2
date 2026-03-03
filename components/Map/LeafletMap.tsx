@@ -12,8 +12,7 @@ import { useEffect, useState } from 'react';
 import { useMap } from 'react-leaflet';
 
 // Fix for default marker icons in Leaflet with Next.js
-// @ts-ignore
-delete L.Icon.Default.prototype._getIconUrl;
+delete (L.Icon.Default.prototype as unknown as { _getIconUrl?: unknown })._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
   iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
@@ -43,6 +42,7 @@ interface MapProps {
   center?: [number, number];
   zoom?: number;
   focusPositions?: [number, number][];
+  onVehicleClick?: (vehicle: Vehicle) => void;
   className?: string;
 }
 
@@ -69,7 +69,7 @@ function MapFocusController({ focusPositions, center, zoom }: { focusPositions?:
   return null;
 }
 
-export default function LeafletMap({ vehicles, center = [33.8869, 9.5375], zoom = 7, focusPositions, className }: MapProps) {
+export default function LeafletMap({ vehicles, center = [33.8869, 9.5375], zoom = 7, focusPositions, onVehicleClick, className }: MapProps) {
   const { theme, systemTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
@@ -98,6 +98,9 @@ export default function LeafletMap({ vehicles, center = [33.8869, 9.5375], zoom 
             key={vehicle.id} 
             position={[vehicle.location.lat, vehicle.location.lng]}
             icon={getIcon(vehicle.status)}
+            eventHandlers={{
+              click: () => onVehicleClick?.(vehicle),
+            }}
           >
             <Popup>
               <div className="p-2 min-w-[200px]">

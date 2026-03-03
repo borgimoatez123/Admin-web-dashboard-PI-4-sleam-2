@@ -32,6 +32,12 @@ const normalizeUser = (raw: any): User => {
     role: normalizeRole(data?.role),
     status: 'ACTIVE',
     createdAt: String(data?.createdAt ?? new Date().toISOString()),
+    agencyName: typeof data?.agencyName === 'string' ? data.agencyName : data?.agency?.name,
+    agencyLocation: (data?.agencyLocation || data?.agency?.location) ? {
+      city: data?.agencyLocation?.city ?? data?.agency?.location?.city,
+      lat: typeof (data?.agencyLocation?.lat ?? data?.agency?.location?.lat) === 'number' ? (data?.agencyLocation?.lat ?? data?.agency?.location?.lat) : undefined,
+      lng: typeof (data?.agencyLocation?.lng ?? data?.agency?.location?.lng) === 'number' ? (data?.agencyLocation?.lng ?? data?.agency?.location?.lng) : undefined,
+    } : undefined,
   };
 };
 
@@ -77,5 +83,26 @@ export const getCurrentUser = async (): Promise<User | null> => {
     return normalizeUser(response.data);
   } catch (error) {
     return null;
+  }
+};
+
+type UpdateAgencyPayload = {
+  agencyName: string;
+  agencyLocation: {
+    city?: string;
+    lat: number;
+    lng: number;
+  };
+};
+
+export const updateAgency = async (payload: UpdateAgencyPayload): Promise<User> => {
+  const response = await api.put('/auth/agency', payload);
+  // Many backends return updated user or a {success} object; refetch to be safe
+  try {
+    const me = await api.get<MeApiResponse>('/auth/me');
+    return normalizeUser(me.data);
+  } catch {
+    // Fallback to minimal user shape if /me not available
+    return normalizeUser(response.data);
   }
 };

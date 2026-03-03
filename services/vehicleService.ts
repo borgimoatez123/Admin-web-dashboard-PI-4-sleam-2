@@ -94,6 +94,21 @@ const normalizeVehicle = (raw: any): Vehicle => {
     status: normalizeVehicleStatus(raw?.status),
     city: String(city),
     location: typeof lat === 'number' && typeof lng === 'number' ? { lat, lng } : undefined,
+    agency: raw?.agency ? {
+      name: typeof raw.agency?.name === 'string' ? raw.agency.name : undefined,
+      location: raw.agency?.location ? {
+        city: raw.agency?.location?.city,
+        lat: typeof raw.agency?.location?.lat === 'number' ? raw.agency.location.lat : undefined,
+        lng: typeof raw.agency?.location?.lng === 'number' ? raw.agency.location.lng : undefined,
+      } : undefined,
+    } : (raw?.agencyName || raw?.agencyLocation) ? {
+      name: raw?.agencyName,
+      location: raw?.agencyLocation ? {
+        city: raw?.agencyLocation?.city,
+        lat: typeof raw?.agencyLocation?.lat === 'number' ? raw.agencyLocation.lat : undefined,
+        lng: typeof raw?.agencyLocation?.lng === 'number' ? raw.agencyLocation.lng : undefined,
+      } : undefined,
+    } : undefined,
     createdAt: String(raw?.createdAt ?? new Date().toISOString()),
     updatedAt: String(raw?.updatedAt ?? raw?.createdAt ?? new Date().toISOString()),
     batteryLevel: typeof raw?.batteryLevel === 'number' ? raw.batteryLevel : undefined,

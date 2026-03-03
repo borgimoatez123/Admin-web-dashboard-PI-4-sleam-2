@@ -30,18 +30,26 @@ import { Loader2, MoreHorizontal, CheckCircle, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
+import { getCurrentUser } from '@/services/authService';
 
 export default function BookingsPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [agencyNameFilter, setAgencyNameFilter] = useState<string | undefined>(undefined);
 
   const fetchBookings = async () => {
     setLoading(true);
     try {
       const data = await getBookings(1, 100, statusFilter);
-      // @ts-ignore
-      setBookings(data.bookings || []);
+      const all: Booking[] = (data.bookings || []) as Booking[];
+      const filtered: Booking[] = agencyNameFilter
+        ? all.filter((b: Booking) => {
+          const bookingAgencyName = (b.agency?.name ?? b.vehicle?.agency?.name ?? '').trim().toLowerCase();
+          return bookingAgencyName === agencyNameFilter.trim().toLowerCase();
+        })
+        : all;
+      setBookings(filtered);
     } catch (error) {
       toast.error('Failed to fetch bookings');
     } finally {
@@ -50,8 +58,19 @@ export default function BookingsPage() {
   };
 
   useEffect(() => {
+    let mounted = true;
+    getCurrentUser().then((u) => {
+      if (!mounted) return;
+      setAgencyNameFilter(u?.agencyName);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
     fetchBookings();
-  }, [statusFilter]);
+  }, [statusFilter, agencyNameFilter]);
 
   const handleStatusChange = async (id: string, status: any) => {
     try {

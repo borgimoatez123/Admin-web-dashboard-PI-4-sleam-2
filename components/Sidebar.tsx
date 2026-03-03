@@ -13,7 +13,8 @@ import {
   ShieldAlert,
   ChevronLeft,
   ChevronRight,
-  Menu
+  Menu,
+  Building2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { deleteCookie } from 'cookies-next';
@@ -51,6 +52,11 @@ const sidebarItems = [
     title: 'Incidents',
     href: '/dashboard/incidents',
     icon: ShieldAlert,
+  },
+  {
+    title: 'Agency Settings',
+    href: '/dashboard/agency-settings',
+    icon: Building2,
   },
 ];
 

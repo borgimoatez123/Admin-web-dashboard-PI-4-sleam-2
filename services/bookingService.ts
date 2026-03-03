@@ -37,6 +37,21 @@ const normalizeBooking = (raw: any): Booking => {
       status: 'ACTIVE',
       createdAt: String(user?.createdAt ?? ''),
     } : undefined,
+    agency: raw?.agency ? {
+      name: typeof raw.agency?.name === 'string' ? raw.agency.name : undefined,
+      location: raw.agency?.location ? {
+        city: raw.agency?.location?.city,
+        lat: typeof raw.agency?.location?.lat === 'number' ? raw.agency.location.lat : undefined,
+        lng: typeof raw.agency?.location?.lng === 'number' ? raw.agency.location.lng : undefined,
+      } : undefined,
+    } : (raw?.agencyName || raw?.agencyLocation) ? {
+      name: raw?.agencyName,
+      location: raw?.agencyLocation ? {
+        city: raw?.agencyLocation?.city,
+        lat: typeof raw?.agencyLocation?.lat === 'number' ? raw.agencyLocation.lat : undefined,
+        lng: typeof raw?.agencyLocation?.lng === 'number' ? raw.agencyLocation.lng : undefined,
+      } : undefined,
+    } : undefined,
     vehicle: vehicle && typeof vehicle === 'object' ? {
       id: String(vehicle?._id ?? vehicle?.id ?? ''),
       model: String(vehicle?.model ?? ''),
@@ -49,6 +64,21 @@ const normalizeBooking = (raw: any): Booking => {
       createdAt: String(vehicle?.createdAt ?? ''),
       updatedAt: String(vehicle?.updatedAt ?? vehicle?.createdAt ?? ''),
       location: (typeof vehicle?.location?.lat === 'number' && typeof vehicle?.location?.lng === 'number') ? { lat: vehicle.location.lat, lng: vehicle.location.lng } : undefined,
+      agency: vehicle?.agency ? {
+        name: typeof vehicle.agency?.name === 'string' ? vehicle.agency.name : undefined,
+        location: vehicle.agency?.location ? {
+          city: vehicle.agency?.location?.city,
+          lat: typeof vehicle.agency?.location?.lat === 'number' ? vehicle.agency.location.lat : undefined,
+          lng: typeof vehicle.agency?.location?.lng === 'number' ? vehicle.agency.location.lng : undefined,
+        } : undefined,
+      } : (vehicle?.agencyName || vehicle?.agencyLocation) ? {
+        name: vehicle?.agencyName,
+        location: vehicle?.agencyLocation ? {
+          city: vehicle?.agencyLocation?.city,
+          lat: typeof vehicle?.agencyLocation?.lat === 'number' ? vehicle.agencyLocation.lat : undefined,
+          lng: typeof vehicle?.agencyLocation?.lng === 'number' ? vehicle.agencyLocation.lng : undefined,
+        } : undefined,
+      } : undefined,
     } as any : undefined,
     startDate: String(raw?.startDate ?? ''),
     endDate: String(raw?.endDate ?? ''),

@@ -71,4 +71,3 @@ Source: [tracking/page.tsx](file:///c:/Users/borgi/Documents/trae_projects/New%2
 - Resolve incident (PATCH/PUT fallback depending on backend)
 
 Source: [incidents/page.tsx](file:///c:/Users/borgi/Documents/trae_projects/New%20folder/saves-admin/app/dashboard/incidents/page.tsx)
-

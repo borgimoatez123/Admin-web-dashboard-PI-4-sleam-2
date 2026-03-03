@@ -9,6 +9,8 @@ import { Loader2, RefreshCw, Car, ShieldAlert, AlertTriangle, Wrench, CalendarDa
 import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import VehicleMonitoringSimulation from '@/components/VehicleMonitoringSimulation';
+import { getCurrentUser } from '@/services/authService';
 
 // Dynamically import Leaflet map to avoid SSR issues
 const LeafletMap = dynamic(() => import('@/components/Map/LeafletMap'), {
@@ -26,17 +28,33 @@ export default function TrackingPage() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null); // Initialize as null to prevent hydration mismatch
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
+  const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
+  const [agencyNameFilter, setAgencyNameFilter] = useState<string | undefined>(undefined);
 
   const fetchLocations = async () => {
     try {
-      const data = await getAllVehiclesForMap();
-      setVehicles(data);
+      const data: Vehicle[] = await getAllVehiclesForMap();
+      const filtered = agencyNameFilter
+        ? data.filter((v: Vehicle) => (v.agency?.name ?? '').trim().toLowerCase() === agencyNameFilter.trim().toLowerCase())
+        : data;
+      setVehicles(filtered);
       setLastUpdated(new Date());
       setLoading(false);
     } catch (error) {
       console.error('Failed to fetch vehicle locations', error);
     }
   };
+
+  useEffect(() => {
+    let mounted = true;
+    getCurrentUser().then((u) => {
+      if (!mounted) return;
+      setAgencyNameFilter(u?.agencyName);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     fetchLocations();
@@ -47,7 +65,7 @@ export default function TrackingPage() {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, []);
+  }, [agencyNameFilter]);
 
   const getStatusCount = (status: string) => 
     vehicles.filter(v => v.status === status).length;
@@ -133,8 +151,26 @@ export default function TrackingPage() {
 
       {/* Full Screen Map */}
       <div className="h-full w-full">
-        <LeafletMap vehicles={mapVehicles} focusPositions={selectedStatus ? focusPositions : undefined} className="h-full w-full z-0" />
+        <LeafletMap
+          vehicles={mapVehicles}
+          focusPositions={selectedStatus ? focusPositions : undefined}
+          onVehicleClick={(v: Vehicle) => setSelectedVehicle(v)}
+          className="h-full w-full z-0"
+        />
       </div>
+
+      {selectedVehicle && (
+        <div className="absolute bottom-4 left-4 right-4 z-20 pointer-events-none">
+          <div className="pointer-events-auto">
+            <div className="mb-3 flex justify-end">
+              <Button variant="outline" className="bg-background/80 backdrop-blur-md" onClick={() => setSelectedVehicle(null)}>
+                Close
+              </Button>
+            </div>
+            <VehicleMonitoringSimulation key={selectedVehicle.id} vehicle={selectedVehicle} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

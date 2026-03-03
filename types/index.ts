@@ -7,6 +7,12 @@ export interface User {
   role: Role;
   status: 'ACTIVE' | 'BLOCKED';
   createdAt: string;
+  agencyName?: string;
+  agencyLocation?: {
+    city?: string;
+    lat?: number;
+    lng?: number;
+  };
 }
 
 export type VehicleStatus = 'AVAILABLE' | 'BOOKED' | 'MAINTENANCE' | 'STOLEN' | 'ACCIDENT';
@@ -27,6 +33,14 @@ export interface Vehicle {
   status: VehicleStatus;
   city: string;
   imageUrl?: string;
+  agency?: {
+    name?: string;
+    location?: {
+      city?: string;
+      lat?: number;
+      lng?: number;
+    };
+  };
   
   // Telemetry Data
   location?: VehicleLocation;
@@ -44,6 +58,14 @@ export interface Booking {
   vehicleId: string;
   user?: User; // Populated
   vehicle?: Vehicle; // Populated
+  agency?: {
+    name?: string;
+    location?: {
+      city?: string;
+      lat?: number;
+      lng?: number;
+    };
+  };
   startDate: string;
   endDate: string;
   totalPrice: number;
