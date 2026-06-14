@@ -5,12 +5,32 @@ import { useEffect, useState, useRef } from 'react';
 import { getAllVehiclesForMap } from '@/services/vehicleService';
 import { Vehicle } from '@/types';
 import { Card, CardContent } from '@/components/ui/card';
-import { Loader2, RefreshCw, Car, ShieldAlert, AlertTriangle, Wrench, CalendarDays, CheckCircle } from 'lucide-react';
+import { Loader2, RefreshCw, Car, ShieldAlert, AlertTriangle, Wrench, CalendarDays, CheckCircle, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import VehicleMonitoringSimulation from '@/components/VehicleMonitoringSimulation';
 import { getCurrentUser } from '@/services/authService';
+
+// Distance in km between two lat/lng points (Haversine)
+function haversineDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+// Minimum movement in km to trigger a suspicious alert
+const SUSPICIOUS_MOVEMENT_THRESHOLD_KM = 0.05;
+
+interface SuspiciousVehicle {
+  vehicle: Vehicle;
+  distanceMoved: number;
+  detectedAt: Date;
+}
 
 // Dynamically import Leaflet map to avoid SSR issues
 const LeafletMap = dynamic(() => import('@/components/Map/LeafletMap'), {
@@ -25,11 +45,13 @@ const LeafletMap = dynamic(() => import('@/components/Map/LeafletMap'), {
 export default function TrackingPage() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null); // Initialize as null to prevent hydration mismatch
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
   const [agencyNameFilter, setAgencyNameFilter] = useState<string | undefined>(undefined);
+  const [suspiciousVehicles, setSuspiciousVehicles] = useState<SuspiciousVehicle[]>([]);
+  const prevLocationsRef = useRef<Map<string, { lat: number; lng: number }>>(new Map());
 
   const fetchLocations = async () => {
     try {
@@ -37,6 +59,33 @@ export default function TrackingPage() {
       const filtered = agencyNameFilter
         ? data.filter((v: Vehicle) => (v.agency?.name ?? '').trim().toLowerCase() === agencyNameFilter.trim().toLowerCase())
         : data;
+
+      // Detect suspicious movement: non-booked vehicles whose location changed
+      const newSuspicious: SuspiciousVehicle[] = [];
+      const prevLocations = prevLocationsRef.current;
+
+      filtered.forEach((vehicle) => {
+        if (vehicle.status === 'BOOKED' || vehicle.status === 'STOLEN') return;
+        if (!vehicle.location) return;
+
+        const prev = prevLocations.get(vehicle.id);
+        if (prev) {
+          const dist = haversineDistance(prev.lat, prev.lng, vehicle.location.lat, vehicle.location.lng);
+          if (dist >= SUSPICIOUS_MOVEMENT_THRESHOLD_KM) {
+            newSuspicious.push({ vehicle, distanceMoved: dist, detectedAt: new Date() });
+          }
+        }
+        prevLocations.set(vehicle.id, { lat: vehicle.location.lat, lng: vehicle.location.lng });
+      });
+
+      if (newSuspicious.length > 0) {
+        setSuspiciousVehicles((prev) => {
+          const existingIds = new Set(prev.map((s) => s.vehicle.id));
+          const fresh = newSuspicious.filter((s) => !existingIds.has(s.vehicle.id));
+          return [...prev, ...fresh];
+        });
+      }
+
       setVehicles(filtered);
       setLastUpdated(new Date());
       setLoading(false);
@@ -171,6 +220,54 @@ export default function TrackingPage() {
           </div>
         </div>
       )}
+
+      {/* Suspicious Movement Alerts */}
+      <AnimatePresence>
+        {suspiciousVehicles.length > 0 && (
+          <motion.div
+            initial={{ x: 60, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: 60, opacity: 0 }}
+            className="absolute top-32 right-4 z-20 flex flex-col gap-2 max-w-xs pointer-events-auto"
+          >
+            <div className="bg-red-950/90 backdrop-blur-md border border-red-600/40 rounded-xl p-3 shadow-lg">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2 text-red-400">
+                  <ShieldAlert className="h-4 w-4" />
+                  <span className="text-sm font-bold uppercase tracking-wide">Suspicious Movement</span>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 text-red-400 hover:text-red-200 hover:bg-red-900/50"
+                  onClick={() => setSuspiciousVehicles([])}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+              <div className="flex flex-col gap-2">
+                {suspiciousVehicles.map((s) => (
+                  <div
+                    key={s.vehicle.id}
+                    className="bg-red-900/40 border border-red-700/30 rounded-lg p-2 cursor-pointer hover:bg-red-900/60 transition-colors"
+                    onClick={() => {
+                      setSelectedVehicle(s.vehicle);
+                      setSuspiciousVehicles((prev) => prev.filter((x) => x.vehicle.id !== s.vehicle.id));
+                    }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-semibold text-red-100">{s.vehicle.plateNumber}</span>
+                      <span className="text-xs text-red-400 font-mono">{s.vehicle.status}</span>
+                    </div>
+                    <p className="text-xs text-red-300 mt-0.5">{s.vehicle.model} moved {s.distanceMoved.toFixed(2)} km</p>
+                    <p className="text-xs text-red-500 mt-0.5">Detected at {s.detectedAt.toLocaleTimeString()}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

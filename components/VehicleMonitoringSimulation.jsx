@@ -22,12 +22,15 @@ export default function VehicleMonitoringSimulation({ vehicle }) {
   const [fatigue, setFatigue] = useState(28);
   const [distraction, setDistraction] = useState(18);
   const [aggressiveScore, setAggressiveScore] = useState(22);
-  const [speedHistory, setSpeedHistory] = useState(() =>
-    Array.from({ length: 16 }, (_, i) => ({ t: i + 1, speed: randInt(35, 90) }))
-  );
+  const [speedHistory, setSpeedHistory] = useState([]);
 
   const lastSpeedRef = useRef(speed);
   const intervalRef = useRef(null);
+
+  useEffect(() => {
+    // Initialize speed history on client only to avoid hydration mismatch
+    setSpeedHistory(Array.from({ length: 16 }, (_, i) => ({ t: i + 1, speed: randInt(35, 90) })));
+  }, []);
 
   const status = useMemo(() => {
     if (fatigue > 75) return 'Dangerous';

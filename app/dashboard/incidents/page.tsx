@@ -1,173 +1,242 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Incident } from '@/types';
-import { getIncidents, resolveIncident } from '@/services/incidentService';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { getDamages, Damage } from '@/services/damageService';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { AlertTriangle, ShieldAlert, CheckCircle, MapPin, Loader2 } from 'lucide-react';
-import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
+import {
+  AlertTriangle,
+  MapPin,
+  Loader2,
+  RefreshCw,
+  Gauge,
+  Zap,
+  Clock,
+  Ruler,
+  Weight,
+  Satellite,
+} from 'lucide-react';
 import { format } from 'date-fns';
 import Link from 'next/link';
+import { motion } from 'framer-motion';
 
-const demoIncidents: Incident[] = [
-  {
-    id: 'demo-incident-1',
-    vehicleId: 'SAVES-001',
-    type: 'STOLEN',
-    location: { lat: 36.8065, lng: 10.1815 },
-    description: 'Geofence breach detected. Vehicle moved outside assigned area and stopped transmitting for 3 minutes.',
-    resolved: false,
-    createdAt: new Date(Date.now() - 1000 * 60 * 22).toISOString(),
+const degatConfig: Record<string, { label: string; color: string; border: string; badge: string }> = {
+  GRAVE: {
+    label: 'Severe',
+    color: 'text-red-500',
+    border: 'border-l-red-500',
+    badge: 'bg-red-500/10 text-red-500 border-red-500/30',
   },
-  {
-    id: 'demo-incident-2',
-    vehicleId: 'SAVES-014',
-    type: 'ACCIDENT',
-    location: { lat: 35.8256, lng: 10.6084 },
-    description: 'Impact event detected. Sudden deceleration and airbag sensor trigger. Immediate verification required.',
-    resolved: false,
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 3).toISOString(),
+  MODERE: {
+    label: 'Moderate',
+    color: 'text-orange-500',
+    border: 'border-l-orange-500',
+    badge: 'bg-orange-500/10 text-orange-500 border-orange-500/30',
   },
-  {
-    id: 'demo-incident-3',
-    vehicleId: 'SAVES-009',
-    type: 'ACCIDENT',
-    location: { lat: 34.7406, lng: 10.7603 },
-    description: 'Low-speed collision alert. Driver reported minor damage. Awaiting field team confirmation.',
-    resolved: true,
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 26).toISOString(),
-    resolvedAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
+  LEGER: {
+    label: 'Minor',
+    color: 'text-yellow-500',
+    border: 'border-l-yellow-500',
+    badge: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/30',
   },
-];
+};
+
+function getDegatConfig(degat: string) {
+  return degatConfig[degat?.toUpperCase()] ?? degatConfig['GRAVE'];
+}
+
+/**
+ * Damage % = how much force exceeded the threshold × structural compression ratio
+ * Clamped to [0, 100]
+ */
+function calcDamagePercent(d: Damage): number {
+  if (d.seuil_N <= 0 || d.distance_debut_mm <= 0) return 0;
+  const forceRatio = d.force_N / d.seuil_N;                          // e.g. 14.9x threshold
+  const compressionRatio = d.delta_distance_mm / d.distance_debut_mm; // 0–1 structural crush
+  const raw = forceRatio * compressionRatio * 10;                     // scale to 0–100 range
+  return Math.min(100, Math.max(0, Math.round(raw)));
+}
+
+function DamageBar({ percent, color }: { percent: number; color: string }) {
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between text-xs">
+        <span className="text-muted-foreground uppercase tracking-wide font-medium">Damage Score</span>
+        <span className={`font-bold text-sm ${color}`}>{percent}%</span>
+      </div>
+      <div className="h-2.5 w-full rounded-full bg-muted overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all duration-500 ${
+            percent >= 80 ? 'bg-red-500' : percent >= 50 ? 'bg-orange-500' : 'bg-yellow-500'
+          }`}
+          style={{ width: `${percent}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function StatItem({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: string }) {
+  return (
+    <div className="flex items-center gap-2 text-sm">
+      <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
+      <span className="text-muted-foreground">{label}:</span>
+      <span className="font-medium">{value}</span>
+    </div>
+  );
+}
 
 export default function IncidentsPage() {
-  const [incidents, setIncidents] = useState<Incident[]>([]);
+  const [damages, setDamages] = useState<Damage[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchIncidents = async () => {
-    try {
-      const data = await getIncidents();
-      // Sort: Unresolved first, then by date (newest first)
-      const sorted = data.sort((a, b) => {
-        if (a.resolved === b.resolved) {
-          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-        }
-        return a.resolved ? 1 : -1;
-      });
-      setIncidents(sorted);
-    } catch (error) {
-      toast.error('Failed to load incidents');
-    } finally {
-      setLoading(false);
-    }
+  const fetchDamages = async () => {
+    setLoading(true);
+    const data = await getDamages();
+    // newest first
+    data.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    setDamages(data);
+    setLoading(false);
   };
 
   useEffect(() => {
-    fetchIncidents();
+    fetchDamages();
   }, []);
-
-  const handleResolve = async (id: string) => {
-    try {
-      await resolveIncident(id);
-      toast.success('Incident marked as resolved');
-      fetchIncidents();
-    } catch (error) {
-      toast.error('Failed to resolve incident');
-    }
-  };
 
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+        >
+          <Loader2 className="h-8 w-8 text-primary" />
+        </motion.div>
       </div>
     );
   }
 
-  const isDemoMode = incidents.length === 0;
-  const incidentsToRender = isDemoMode ? demoIncidents : incidents;
-
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-3xl font-bold tracking-tight">Incident Alerts</h2>
-        <p className="text-muted-foreground">
-          Monitor and manage vehicle security incidents
-        </p>
-      </div>
+      <motion.div
+        className="flex items-center justify-between"
+        initial={{ opacity: 0, y: -16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+      >
+        <div>
+          <h2 className="text-3xl font-bold tracking-tight">Incident Alerts</h2>
+          <p className="text-muted-foreground">
+            Real-time collision and damage events — {damages.length} recorded
+          </p>
+        </div>
+        <Button variant="outline" size="sm" onClick={fetchDamages}>
+          <RefreshCw className="h-4 w-4 mr-2" />
+          Refresh
+        </Button>
+      </motion.div>
 
-      <div className="grid gap-4">
-        {isDemoMode && (
+      {damages.length === 0 ? (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}>
           <Card>
-            <CardContent className="py-6 text-sm text-muted-foreground">
-              No incidents reported yet. Showing sample alerts.
+            <CardContent className="py-10 text-center text-muted-foreground">
+              No damage incidents recorded yet.
             </CardContent>
           </Card>
-        )}
+        </motion.div>
+      ) : (
+        <div className="grid gap-4">
+          {damages.map((d, index) => {
+            const cfg = getDegatConfig(d.degat);
+            const damagePercent = calcDamagePercent(d);
+            return (
+              <motion.div
+                key={d.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.07, duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+                whileHover={{ y: -2, transition: { type: 'spring', stiffness: 400, damping: 20 } }}
+              >
+              <Card className={`border-l-4 ${cfg.border}`}>
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <AlertTriangle className={`h-5 w-5 shrink-0 ${cfg.color}`} />
+                      <div>
+                        <CardTitle className="text-base">
+                          Collision #{index + 1}
+                          <span className="ml-2 text-xs font-mono text-muted-foreground">{d.id.slice(-8)}</span>
+                        </CardTitle>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {format(new Date(d.createdAt), 'PPP · HH:mm:ss')}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Badge variant="outline" className={cfg.badge}>
+                        {cfg.label}
+                      </Badge>
+                      <Badge variant="outline" className={d.gps_fixe ? 'bg-green-500/10 text-green-500 border-green-500/30' : 'bg-muted text-muted-foreground'}>
+                        <Satellite className="h-3 w-3 mr-1" />
+                        {d.gps_fixe ? 'GPS Fixed' : 'No GPS'}
+                      </Badge>
+                    </div>
+                  </div>
+                </CardHeader>
 
-        {incidentsToRender.map((incident) => (
-            <Card key={incident.id} className={incident.resolved ? 'opacity-70 bg-muted/50' : 'border-l-4 border-l-red-500'}>
-              <CardHeader className="pb-2">
-                <div className="flex justify-between items-start">
-                  <div className="flex items-center gap-2">
-                    {incident.type === 'STOLEN' ? (
-                      <ShieldAlert className="h-5 w-5 text-red-600" />
-                    ) : (
-                      <AlertTriangle className="h-5 w-5 text-orange-600" />
-                    )}
-                    <CardTitle className="text-lg">
-                      {incident.type} ALERT - Vehicle ID: {incident.vehicleId}
-                    </CardTitle>
-                    {isDemoMode && (
-                      <Badge variant="outline" className="ml-2">
-                        Demo
-                      </Badge>
-                    )}
-                    {incident.resolved && (
-                      <Badge variant="outline" className="ml-2 bg-green-50 text-green-700 border-green-200">
-                        Resolved
-                      </Badge>
-                    )}
+                <CardContent className="space-y-4">
+                  {/* Impact metrics */}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    <div className="rounded-lg bg-muted/50 p-3 space-y-1">
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide">Impact Force</p>
+                      <p className={`text-xl font-bold ${cfg.color}`}>{d.force_N.toFixed(1)} N</p>
+                      <p className="text-xs text-muted-foreground">Threshold: {d.seuil_N} N</p>
+                    </div>
+                    <div className="rounded-lg bg-muted/50 p-3 space-y-1">
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide">Speed at Impact</p>
+                      <p className="text-xl font-bold">{d.vitesse_ms.toFixed(3)} m/s</p>
+                      <p className="text-xs text-muted-foreground">{(d.vitesse_ms * 3.6).toFixed(2)} km/h</p>
+                    </div>
+                    <div className="rounded-lg bg-muted/50 p-3 space-y-1">
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide">Deformation</p>
+                      <p className="text-xl font-bold">{d.delta_distance_mm.toFixed(1)} mm</p>
+                      <p className="text-xs text-muted-foreground">Over {d.delta_temps_s}s</p>
+                    </div>
                   </div>
-                  <div className="text-sm text-muted-foreground">
-                    {format(new Date(incident.createdAt), 'PPP p')}
+
+                  {/* Damage percentage bar */}
+                  <DamageBar percent={damagePercent} color={cfg.color} />
+
+                  {/* Detail row */}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-2 pt-1">
+                    <StatItem icon={Ruler} label="Start dist." value={`${d.distance_debut_mm} mm`} />
+                    <StatItem icon={Ruler} label="End dist." value={`${d.distance_fin_mm} mm`} />
+                    <StatItem icon={Weight} label="Vehicle mass" value={`${d.masse_kg} kg`} />
+                    <StatItem icon={Clock} label="Start time" value={d.heure_debut} />
+                    <StatItem icon={Clock} label="End time" value={d.heure_fin} />
+                    <StatItem icon={Zap} label="Duration" value={`${d.delta_temps_s}s`} />
                   </div>
-                </div>
-                <CardDescription>
-                  {incident.description}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex justify-between items-center mt-2">
-                  <div className="flex items-center gap-2 text-sm">
-                    <MapPin className="h-4 w-4 text-muted-foreground" />
-                    <span>Lat: {incident.location.lat}, Lng: {incident.location.lng}</span>
-                  </div>
-                  <div className="flex gap-2">
+
+                  {/* Footer */}
+                  <div className="flex items-center justify-between pt-1 border-t">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <MapPin className="h-4 w-4" />
+                      <span>{d.location.latitude.toFixed(4)}, {d.location.longitude.toFixed(4)}</span>
+                    </div>
                     <Link href="/dashboard/tracking">
                       <Button variant="outline" size="sm">
                         View on Map
                       </Button>
                     </Link>
-                    {!isDemoMode && !incident.resolved && (
-                      <Button 
-                        variant="default" 
-                        size="sm" 
-                        onClick={() => handleResolve(incident.id)}
-                        className="bg-green-600 hover:bg-green-700"
-                      >
-                        <CheckCircle className="mr-2 h-4 w-4" />
-                        Mark Resolved
-                      </Button>
-                    )}
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-      </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
